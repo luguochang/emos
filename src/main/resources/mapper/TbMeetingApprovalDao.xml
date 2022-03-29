@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.emos.wx.db.dao.TbMeetingApprovalDao">
+    <insert id="insertApproval" parameterType="com.example.emos.wx.db.pojo.TbMeetingApproval">
+
+        INSERT INTO tb_meeting_approval
+        SET uuid = #{uuid},
+        <if test="last_user!=null">
+            last_user = #{last_user},
+        </if>
+        members = #{members},
+        <if test="approvals!=null">
+            approvals = #{approvals}
+        </if>
+    </insert>
+
+
+    <delete id="deleteApprovalByUUID" parameterType="String">
+        DELETE FROM  tb_meeting_approval
+        WHERE uuid=#{uuid}
+    </delete>
+    
+    <select id="searchNeedApprovalMeeting" parameterType="int" resultType="HashMap">
+        select m.id,m.uuid,m.title,m.status,m.date,m.creator_id,m.instance_id as instanceId,
+               CASE m.type
+                   WHEN 1 THEN "在线会议"
+                   WHEN 2 THEN "线下会议"
+                   END AS type,
+               TIMESTAMPDIFF(HOUR,CONCAT(m.date," ",m.start),CONCAT(m.date," ",m.end)) AS hour,
+				a.members,
+				u.name,u.photo
+        from tb_meeting_approval a
+        join tb_meeting m on m.uuid=a.uuid
+        join tb_user u on u.id=m.creator_id
+        where JSON_CONTAINS(a.members,CAST(#{userId} as char )) and !JSON_CONTAINS(a.approvals,CAST(#{userId} as char)) and m.status=1;
+    </select>
+
+    <select id="searchAlreadyApprovalMeeting" parameterType="int" resultType="HashMap">
+        SELECT  m.id,m.uuid,m.title,m.status,m.date,m.creator_id,
+                CASE m.type
+                    WHEN 1 THEN "在线会议"
+                    WHEN 2 THEN "线下会议"
+                    END AS type,
+                TIMESTAMPDIFF(HOUR,CONCAT(m.date," ",m.start),CONCAT(m.date," ",m.end)) AS hour,
+				a.members,a.approvals,a.last_user,
+				u.name,u.photo,
+                u2.name AS lastUserName,
+                u2.photo as lastUserPhoto
+
+        FROM tb_meeting_approval a
+            JOIN tb_meeting m ON a.uuid = m.uuid
+            JOIN tb_user u ON u.id = m.creator_id
+            JOIN tb_user u2 ON u2.id = a.last_user
+        WHERE  JSON_CONTAINS (a.members, CAST( #{userId} AS CHAR )) AND JSON_CONTAINS (a.approvals, CAST( #{userId} AS CHAR ))
+    </select>
+
+
+    <select id="searchApprovalByUUID" parameterType="String" resultType="com.example.emos.wx.db.pojo.TbMeetingApproval">
+        SELECT id,uuid,last_user , members,approvals
+        FROM tb_meeting_approval
+        WHERE uuid = #{uuid}
+    </select>
+
+
+    <update id="updateApprovals" parameterType="HashMap">
+        UPDATE tb_meeting_approval
+        SET approvals=#{approvals},last_user = #{userId}
+        WHERE uuid=#{uuid}
+    </update>
+
+
+
+</mapper>
